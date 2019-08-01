@@ -21,7 +21,29 @@ Wrapper around tshark that will let the user filter pcap files for handshakes an
 
 Gathers standard wireless info and puts it into a CSV
 
-# TODO 
+# USAGE Examples:
+
+Run PCAPFix on the dataset to repair damaged or cutshort PCAPs. 
+
+`./pcapinator.py --in [directory or file] --pcapfix --pcapfix_dir [directory for original pcaps before fix] --debug`
+
+Gather all of the typical wireless information from a pcap and output a single CSV. This will split the PCAP files and procees them based on the number of CPU cores you have. 
+
+`./pcapinator.py --in [directory or file] --wifi_csv --split --debug`
+
+Run a custom tshark query and output the fields you specify. In this case its searching for anything email related and ouputting related interesting fields. 
+
+`./pcapinator.py --in [directory or file] --query "tcp.port == 143 || tcp.port == 110 || tcp.port == 25 || tcp.port == 26 || pop || imap || smtp" --fields "-e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e text -e tcp.payload" --split --debug`
+
+A custom query to get HTTP data.
+
+`./pcapinator.py --in [directory or file] --query "http" --fields "-e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e text -e tcp.payload" --split --debug`
+
+Get a CSV file with DNS info.
+
+`./pcapinator.py --in [directory or file] --dnsSimple --split --debug`
+
+# Future Features 
 
 Automatic import into Postgres database from a PCAP file.
 
@@ -36,20 +58,3 @@ Generalized use around tshark to support other options supported by the tool.
 Tool to strip all unencrypted data from pcap files and put the results into new pcap files.
 
 Tool to anonymize traffic datas but maintain context.
-
-# USAGE Examples:
-
-Run PCAPFix on the dataset to repair damaged or cutshort PCAPs. 
-`./pcapinator.py --in [directory or file] --pcapfix --pcapfix_dir [directory for original pcaps before fix] --debug`
-
-Gather all of the typical wireless information from a pcap and output a single CSV. This will split the PCAP files and procees them based on the number of CPU cores you have. 
-`./pcapinator.py --in [directory or file] --wifi_csv --split --debug`
-
-Run a custom tshark query and output the fields you specify. In this case its searching for anything email related and ouputting related interesting fields. 
-`./pcapinator.py --in [directory or file] --query "tcp.port == 143 || tcp.port == 110 || tcp.port == 25 || tcp.port == 26 || pop || imap || smtp" --fields "-e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e text -e tcp.payload" --split --debug`
-
-A custom query to get HTTP data
-`./pcapinator.py --in [directory or file] --query "http" --fields "-e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e text -e tcp.payload" --split --debug`
-
-Get a CSV file with DNS info.
-`./pcapinator.py --in [directory or file] --dnsSimple --split --debug`
