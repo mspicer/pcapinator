@@ -39,6 +39,10 @@ A custom query to get HTTP data.
 
 `./pcapinator.py --in [directory or file] --query "http" --fields "-e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e text -e tcp.payload" --split --debug`
 
+A custom query to get SSIDs that contain the letters TEST, change TEST to your partial search parameter.
+
+./pcapinator.py --in /mnt/e/CapData/DC2018\ -\ WiFiCactus/ --query "wlan.ssid contains TEST" --fields "-e frame.time -e frame.time_epoch -e wlan.sa -e wlan.ta -e wlan.ta_resolved -e wlan.ra -e wlan.da -e wlan.bssid -e wlan.ssid -e wps.manufacturer -e wps.device_name -e wps.model_name -e wps.model_number -e wps.uuid_e -e wlan.fc.type_subtype -e frame.len -e wlan_radio.signal_dbm" --split --debug
+
 Get a CSV file with DNS info.
 
 `./pcapinator.py --in [directory or file] --dnsSimple --split --debug`

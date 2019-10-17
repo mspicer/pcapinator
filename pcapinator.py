@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
+'''
+PCAPinator
+By: Mike Spicer (@d4rkm4tter)
 
+'''
 import argparse
 from dateutil import parser as dateparser
 import datetime, time
