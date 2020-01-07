@@ -31,11 +31,12 @@ CAP2HCCAPX = ''
 PCAPFIXDIR = '' # This is where borked pcaps will go.
 PCAPFIX = ''
 MINSPLIT = 209715200
+UNIQUE_TSV_FIELD = 'ssid'
 
-    
+
 
 def main():
-    global TSHARK, EDITCAP, CAPINFOS, MERGECAP, WSHARK_DIR, EXT, CAP2HCCAPX, VERBOSE, DEBUG, TIMED, PCAPFIX, PCAPFIXDIR, MINSPLIT
+    global TSHARK, EDITCAP, CAPINFOS, MERGECAP, WSHARK_DIR, EXT, CAP2HCCAPX, VERBOSE, DEBUG, TIMED, PCAPFIX, PCAPFIXDIR, MINSPLIT, UNIQUE_TSV_FIELD
 
     parser = argparse.ArgumentParser(description="PCAPinator - Tool for crazy PCAP analysis")
     parser.add_argument("--in", action="store", dest="infile", help="Input PCAP file or directory", required=True)
@@ -61,6 +62,7 @@ def main():
     parser.add_argument("--fields", action="store", dest="tshark_fields", help="The fields list you would like to use with your query, use with --query")
     parser.add_argument("--unique_existing_tsv", action="store_true", dest="existing_tsv", help="Get unique data from an existing TSV file")
     parser.add_argument("--validate_wifi_tsv", action="store_true", dest="validate_tsv", help="Validate and fix a tsv file you are making")
+    parser.add_argument("--unique_tsv_field", action="store", dest="unique_tsv_field", help="Default field: ssid. Combine with --unique_existing_tsv. Specify what tshark field you want to base your unique data on (signal, ta, ra, etc.)")
     args = parser.parse_args()
 
     if args.verbose:
@@ -71,7 +73,10 @@ def main():
         print(args)
     if args.timed:
         TIMED = True
-    
+
+    if args.unique_tsv_field:
+        UNIQUE_TSV_FIELD = args.unique_tsv_field
+
     if args.infile is None:
         usage(parser)
     # if args.askhelp:
@@ -112,7 +117,7 @@ def main():
         pcapfiles.append(args.infile + '.pcap')
     elif os.path.isdir(args.infile):
         pcapfiles = getFilesToProcess(args.infile)
-        
+
     elif os.path.isfile(args.infile):
         pcapfiles.append(args.infile)
 
@@ -121,7 +126,7 @@ def main():
         WSHARK_DIR = args.wshark_dir
 
     if os.name == 'nt':
-        if VERBOSE: 
+        if VERBOSE:
             print("WINDOWS FOUND")
         WSHARK_DIR = "C:/Program Files/Wireshark"
         EXT = ".exe"
@@ -176,12 +181,12 @@ def main():
                 splitpcap(pcapf, split_output, split_count)
         else:
             splitpcap(args.infile, split_output, split_count)
-    
+
     if args.handshakes and (args.split or args.split_count):
         if args.split_output:
             pcapfiles = getFileSplitsToProcess(args.split_output)
             processHandshakes(pcapfiles, split_output)
-        else:    
+        else:
             pcapfiles = getFileSplitsToProcess('.')
             processHandshakes(pcapfiles, split_output)
         if args.hashcat:
@@ -207,7 +212,7 @@ def main():
         processCSV(pcapfiles, args.split_output)
     elif args.wifi_csv:
         processCSV(pcapfiles, '.')
-    
+
     if args.dnssimple and args.split:
         pcapdir = ''
         if args.split_output is not None:
@@ -216,7 +221,7 @@ def main():
         processDNSSimple(pcapfiles)
     elif args.dnssimple:
         processDNSSimple(pcapfiles)
-    
+
     if args.tshark_query and args.tshark_fields and args.split:
         pcapdir = ''
         if args.split_output is not None:
@@ -226,7 +231,7 @@ def main():
     elif args.tshark_query and args.tshark_fields:
         processCustomQuery(pcapfiles, args.tshark_query, args.tshark_fields, '.')
 
-    
+
     if TIMED:
         print("---- Ran pcapinator: {} Seconds ----".format(time.time()-m_start_time))
 
@@ -262,14 +267,14 @@ def processHandshakes(pcapfiles, split_output):
         pool = ThreadPool(len(pcapfiles))
     else:
         pool = ThreadPool(mp.cpu_count())
-    
+
     results = []
     pid = 0
     for f in pcapfiles:
         #-2 means that tshark will perform a two-pass analysis causing buffered output until the entire first pass is done. Prevents errors.
         filename_w_ext = os.path.basename(f)
         filename, file_extension = os.path.splitext(filename_w_ext)
-        
+
         tshark_args = '-R "(wlan.fc.type_subtype == 0x08 || wlan.fc.type_subtype == 0x05 || eapol)" -2 -F pcap -w hs_{}.pcap'.format(filename)
         #tsharking(inpcap, params, output, outext, procid)
         results.append(pool.apply_async(tsharking, (f, tshark_args, '', '', pid)))
@@ -283,7 +288,7 @@ def processHandshakes(pcapfiles, split_output):
 
 def processCSV(pcapfiles, split_output):
     if len(pcapfiles) == 0:
-        if DEBUG: 
+        if DEBUG:
             print("PCAPFILES is length 0 for some reason, something is broken exiting: {}".format(pcapfiles))
         return
     if len(pcapfiles) < mp.cpu_count():
@@ -318,7 +323,7 @@ def processCSV(pcapfiles, split_output):
         tshark_args = tshark_args.replace('    ', '')
         tshark_outargs = filename
         tshark_outext = 'tsv'
-        
+
         results.append(pool.apply_async(tsharking, (f, tshark_args, tshark_outargs, tshark_outext, pid, split_output)))
         pid = pid+1
 
@@ -374,7 +379,7 @@ def processDNSSimple(pcapfiles):
         tshark_args = tshark_args.replace('    ', '')
         tshark_outargs = filename
         tshark_outext = 'tsv'
-        
+
         results.append(pool.apply_async(tsharking, (f, tshark_args, tshark_outargs, tshark_outext, pid)))
         pid = pid+1
 
@@ -436,7 +441,7 @@ def fixWiFiTSVSSID(brokenstr):
 
 
 def makeUniqueExistingTSV(tsvfiles):
-    global VERBOSE, DEBUG, TIMED
+    global VERBOSE, DEBUG, TIMED, UNIQUE_TSV_FIELD
     start_time = time.time()
     MAXSIZE = 1024*1024*1024 #1GB
     CHUNKSZ = 100000000
@@ -448,14 +453,14 @@ def makeUniqueExistingTSV(tsvfiles):
                 hasdup = pd.read_csv(tsvfile, sep='\t', lineterminator='\n', names=['time', 'time_epoch', 'sa', 'ta', 'ta_resolved', 'ra', 'da', 'bssid', 'ssid', 'manufacturer', 'device_name', 'model_name', 'model_number', 'uuid_e', 'fc_type_subtype', 'frame_len', 'signal'],dtype={'device_name': 'object', 'manufacturer': 'object', 'model_name': 'object', 'model_number': 'object','uuid_e':'object', 'fc_type_subtype': 'Int64' })
                 if TIMED:
                     print("---- Read CSV in: {} Seconds ----".format(time.time()-start_time))
-                unique = hasdup.drop_duplicates(subset=['ssid']).sort_values(by='ssid')
+                unique = hasdup.drop_duplicates(subset=[UNIQUE_TSV_FIELD]).sort_values(by=UNIQUE_TSV_FIELD)
                 unique.to_csv('unique-'+tsvfile, sep='\t', index=False)
             else:
                 i=0
                 for chunk in pd.read_csv(tsvfile, sep='\t', lineterminator='\n', names=['time', 'time_epoch', 'sa', 'ta', 'ta_resolved', 'ra', 'da', 'bssid', 'ssid', 'manufacturer', 'device_name', 'model_name', 'model_number', 'uuid_e', 'fc_type_subtype', 'frame_len', 'signal'], chunksize=CHUNKSZ, dtype={'device_name': 'object', 'manufacturer': 'object', 'model_name': 'object', 'model_number': 'object','uuid_e':'object', 'fc_type_subtype': 'Int64' }):
                     if TIMED:
                         print("---- Read in CSV Chunk {} in: {} Seconds ----".format(i,time.time()-start_time))
-                    unique = chunk.drop_duplicates(subset=['ssid'])
+                    unique = chunk.drop_duplicates(subset=[UNIQUE_TSV_FIELD])
                     print(tsvfile)
                     unique.to_csv("chunk_{}-{}.tsv".format(tsvfile[:-4],i),sep='\t', index=False)
                     if TIMED:
@@ -474,12 +479,12 @@ def makeUniqueExistingTSV(tsvfiles):
                     os.remove(f)
                 # Unique and sort one more time without chunking to make sure we have a unique datasaet.
                 hasdup = pd.read_csv(tsvfile, sep='\t', lineterminator='\n', names=['time', 'time_epoch', 'sa', 'ta', 'ta_resolved', 'ra', 'da', 'bssid', 'ssid', 'manufacturer', 'device_name', 'model_name', 'model_number', 'uuid_e', 'fc_type_subtype', 'frame_len', 'signal'],dtype={'device_name': 'object', 'manufacturer': 'object', 'model_name': 'object', 'model_number': 'object','uuid_e':'object', 'fc_type_subtype': 'Int64' })
-                unique = hasdup.drop_duplicates(subset=['ssid']).sort_values(by='ssid')
+                unique = hasdup.drop_duplicates(subset=[UNIQUE_TSV_FIELD]).sort_values(by=UNIQUE_TSV_FIELD)
                 unique.to_csv('unique-'+tsvfile, sep='\t', index=False)
 
                 if TIMED:
                     print("---- Finished CSV Chunking in: {} Seconds ----".format(time.time()-start_time))
-        
+
         if TIMED:
             print("---- Ran Unique-ing process in: {} Seconds ----".format(time.time()-start_time))
     else:
@@ -489,9 +494,9 @@ def makeUniqueExistingTSV(tsvfiles):
 
 # TODO: Build a dossier about a mac address
 # What is interesting now about a mac address?
-# What networks are they probing? What other sites are they visiting? 
+# What networks are they probing? What other sites are they visiting?
 
-# TODO: Process and return a list of everything encrypted and what encryption type 
+# TODO: Process and return a list of everything encrypted and what encryption type
 # IE: wlan.rsn.akms.type == psk
 
 # TODO: Get a list of all the SSID's and unique it
@@ -499,7 +504,7 @@ def makeUniqueExistingTSV(tsvfiles):
 # TODO: Build summary endpoint and conversation reports for IP, TCP, UDP
 # tshark -r input.cap.pcapng -q -z conv,ip > output.txt
 # tshark -r input.cap.pcapng -q -z endpoint,ip > output.txt
-# Gotta parse the output reports and send to Graphistry 
+# Gotta parse the output reports and send to Graphistry
 
 
 # TODO: Need to make mergeCSV handle the case where there are multiple pcaps but not split...
@@ -512,7 +517,7 @@ def mergeCSV(outdir):
         print('outdir: {}'.format(outdir))
         print('OUTPATH: {}'.format(OUT_PATH))
     tsv_files = [os.path.abspath(os.path.join(OUT_PATH,fl)) for fl in os.listdir(OUT_PATH) if 'split' in fl and fl.endswith('tsv')]
-    
+
     # split_Kismet-20170726-10-21-17-1-fixed_00000_20170711010628.tsv
     # split_Kismet-20170725-09-35-21-1_00001_20170711010800.tsv
     # subprocess.call ('"{}" -F pcap -c {} "{}" {}split_{}.pcap'.format(EDITCAP, chunk_size, inpcap, outdir, filename), shell=True)
@@ -530,7 +535,7 @@ def mergeCSV(outdir):
     with open(os.path.join(OUT_PATH,out_filename), 'wb') as fout:
         for f in tsv_files:
             if DEBUG:
-                print("f: %s" % (f))            
+                print("f: %s" % (f))
             with open(f, 'rb') as fin:
                 fin.readline()
                 fout.write(fin.read())
@@ -585,7 +590,7 @@ def processpcapfix(pcapfiles):
             if DEBUG:
                 print('Moving a file that is bork\'d %s' %(f))
             os.rename(f, os.path.join(PCAPFIXDIR, filename_w_ext))
-        
+
 def splitpcap(inpcap, outdir, splitcnt):
     global TSHARK, EDITCAP, CAPINFOS, EXT, VERBOSE, DEBUG, TIMED, MINSPLIT
 
@@ -594,7 +599,7 @@ def splitpcap(inpcap, outdir, splitcnt):
     start_time = time.time()
     if DEBUG:
         print('CMD# "{}" -c -M -T -m "{}"'.format(CAPINFOS,inpcap))
-    try:    
+    try:
         packet_count = int(subprocess.check_output('"{}" -K -c -M -T -m "{}"'.format(CAPINFOS,inpcap), shell=True, encoding='utf8').split(',')[-1])
     except Exception as e:
         if DEBUG or VERBOSE:
@@ -665,7 +670,7 @@ def getFileSplitsToProcess(dir):
 
 def tsharking(inpcap, params, output, outext, procid, outdir='.'):
     global TSHARK, EDITCAP, CAPINFOS, EXT, VERBOSE, DEBUG, TIMED
-    
+
     start_time = time.time()
     if output == '' and outdir == '.':
         if DEBUG:
@@ -685,7 +690,7 @@ def tsharking(inpcap, params, output, outext, procid, outdir='.'):
         if DEBUG:
             print('{} -r "{}" {} >> "{}"'.format(TSHARK, inpcap, params, outfullpath))
         p = subprocess.Popen('"{}" -r "{}" {} >> "{}"'.format(TSHARK, inpcap, params, outfullpath), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    
+
     out, err = p.communicate()
     if TIMED:
         print("---- ProcID: {} Ran tshark: {} Seconds FILE: {} ----".format(procid, time.time()-start_time, inpcap))
@@ -738,23 +743,23 @@ def kismetLog2Pcap(kismetdb, pid):
     lognum = 0
 
     c = db.cursor()
-    
+
     npackets = 0
     for row in c.execute(sql):
         if logf == None:
             if DEBUG or VERBOSE:
                 print("Id: {} Assuming dlt {} for all packets".format(pid, row[2]))
-            
+
             if DEBUG or VERBOSE:
                 print("Logging to {}".format(outfile))
             logf = open(outfile, 'wb')
-            
+
             write_pcap_header(logf, row[2])
-            
+
         write_pcap_packet(logf, row[0], row[1], row[4])
         npackets = npackets + 1
 
-        
+
         if VERBOSE:
             if npackets % 1000 == 0:
                 print("Id: {} Converted {} packets...".format(pid, npackets))
@@ -764,7 +769,7 @@ def kismetLog2Pcap(kismetdb, pid):
 
 def processKismetLog(kismetdbs):
     global VERBOSE, DEBUG, TIMED
-    
+
     if len(kismetdbs) < mp.cpu_count():
         pool = ThreadPool(len(kismetdbs))
     else:
@@ -784,9 +789,9 @@ def processKismetLog(kismetdbs):
 
 def usage(parser):
     print("""-------------------------------------------------------------
-                                                               
+
                     PCAPinator
-                    
+
 -------------------------------------------------------------
 """)
     parser.print_help()
