@@ -163,7 +163,7 @@ def main():
         processpcapfix(pcapfiles)
 
     if args.minsplitsz is not None:
-        MINSPLIT = args.minsplitsz
+        MINSPLIT = int(args.minsplitsz)
 
     if args.split or args.split_count:
         split_count = 0
