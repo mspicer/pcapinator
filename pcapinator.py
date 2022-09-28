@@ -510,7 +510,7 @@ def makeUniqueExistingTSV(tsvfiles):
 # TODO: Need to make mergeCSV handle the case where there are multiple pcaps but not split...
 # I think the above is handled now because I copy a file over and prepend 'split' to it... need to double check.
 
-def mergeCSV(outdir):
+def mergeCSV(outdir='.'):
     global VERBOSE, DEBUG, TIMED
     OUT_PATH = os.path.abspath(outdir)
     if DEBUG:
